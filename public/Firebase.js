@@ -11,13 +11,13 @@ import {
 
 // Requirements to work with Firebase
 const firebaseConfig = {
-  apiKey: "AIzaSyD3hebXsH5unAwlPRQzdV_4HFcAcYwt8-Q",
-  authDomain: "virus-scope.firebaseapp.com",
-  projectId: "virus-scope",
-  storageBucket: "virus-scope.appspot.com",
-  messagingSenderId: "799002158988",
-  appId: "1:799002158988:web:2cf0ad5a149e6c2bf998a9",
-  measurementId: "G-SQNH7CGHKW",
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.REACT_APP_FIREBASE_APP_ID,
+  measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID,
 };
 
 // Initialize Firebase
