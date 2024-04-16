@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, createContext, useEffect } from "react";
-import { authStatus } from "./Firebase";
+import { authStatus } from "../public/Firebase";
 
 const AuthContext = createContext({
   authenticated: false,
@@ -27,7 +27,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     checkAuthStatus();
-  }, []);
+  }, [authenticated]);
 
   const value = {
     authenticated,

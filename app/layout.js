@@ -1,5 +1,8 @@
 import "./globals.css";
-import { AuthProvider } from "@/public/AuthContext";
+import { AuthProvider } from "@/app/AuthContext";
+import { Poppins } from "next/font/google";
+
+const poppins = Poppins({ subsets: ["latin"], weight: ["500"] });
 
 export const metadata = {
   title: "Virus Scope",
@@ -10,7 +13,7 @@ export default function RootLayout({ children }) {
   return (
     <AuthProvider>
       <html lang="en">
-        <body>{children}</body>
+        <body className={poppins.className}>{children}</body>
       </html>
     </AuthProvider>
   );
