@@ -17,44 +17,65 @@ const dbConfig = {
 
 // Query 1 API CALLS - COMPLETE
 app.get("/query1", async (req, res) => {
-  const { timeframe } = req.query;
+  const { timeframe, getCountries, countryId } = req.query;
   let query;
 
+  // Base WITH clause for all queries
   const withClause = `
-    WITH Query1 (Country_ID, Country, CasesPerMil, Date_, Yr_Week, Yr_Month, Stock, StringencyIndex) AS (
-      SELECT CInfo.Country_ID, CInfo.Name, New_Cases/(Population/1000000), Stats.Date_Info, TO_CHAR(Stats.Date_Info, 'YYYY-WW'), 
-      TO_CHAR(Stats.Date_Info, 'YYYY-MM'), Dow_Jones_Closing, Stringency_Index
+    WITH Query1 AS (
+      SELECT CInfo.Country_ID, CInfo.Name AS Country, New_Cases/(Population/1000000) AS CasesPerMil, Stats.Date_Info AS Date_, 
+      TO_CHAR(Stats.Date_Info, 'YYYY-WW') AS Yr_Week, TO_CHAR(Stats.Date_Info, 'YYYY-MM') AS Yr_Month, 
+      Dow_Jones_Closing AS Stock, Stringency_Index AS StringencyIndex
       FROM tylerwescott.COVID_Statistics Stats
       JOIN tylerwescott.Country_Info Cinfo ON Cinfo.Country_Id = Stats.Country_Id
       JOIN tylerwescott.Public_Health_Measures HM ON Stats.Country_Id = HM.Country_Id AND Stats.Date_Info = HM.Date_Info
-      LEFT JOIN tylerwescott.Economic_Indicators Eco on Eco.Date_Info = Stats.Date_Info AND Eco.Country_ID = stats.Country_Id
-      WHERE CInfo.Country_ID = 'USA'
+      LEFT JOIN tylerwescott.Economic_Indicators Eco ON Eco.Date_Info = Stats.Date_Info AND Eco.Country_ID = stats.Country_Id
     ),
-    ByDate (Country_ID, Country, "DD-MON-YY", Average_Stringency_Index, Average_Dow_Jones_Closing_Price, Average_Covid_Cases_Per_Million) AS (
-      SELECT Country_ID, Country, Date_, ROUND(AVG(StringencyIndex),2), ROUND(AVG(Stock),2), ROUND(AVG(CasesPerMil),2) 
+    GetCountries AS (
+      SELECT DISTINCT Country_ID, Country
       FROM Query1
-      GROUP BY Country_ID, Country, Date_
-      ORDER BY Country_ID, Date_
-    ),
-    ByWeek (Country_ID, Country, "YYYY-WW", Average_Stringency_Index, Average_Dow_Jones_Closing_Price, Average_Covid_Cases_Per_Million) AS (
-      SELECT Country_ID, Country, Yr_Week, ROUND(AVG(StringencyIndex),2), ROUND(AVG(Stock),2), ROUND(AVG(CasesPerMil),2) 
-      FROM Query1
-      GROUP BY Country_ID, Country, Yr_Week
-      ORDER BY Country_ID, Yr_Week
-    ),
-    ByMonth (Country_ID, Country, "YYYY-MM", Average_Stringency_Index, Average_Dow_Jones_Closing_Price, Average_Covid_Cases_Per_Million) AS (
-      SELECT Country_ID, Country, Yr_Month, ROUND(AVG(StringencyIndex),2), ROUND(AVG(Stock),2), ROUND(AVG(CasesPerMil),2) 
-      FROM Query1
-      GROUP BY Country_ID, Country, Yr_Month
-      ORDER BY Country_ID, Yr_Month
     )`;
 
-  if (timeframe === "daily") {
-    query = `${withClause} SELECT * FROM ByDate`;
-  } else if (timeframe === "weekly") {
-    query = `${withClause} SELECT * FROM ByWeek`;
+  // Parse countryId into an array if it contains multiple countries
+  const countryIds = Array.isArray(countryId)
+    ? countryId
+    : countryId
+    ? countryId.split(",")
+    : [];
+
+  if (getCountries) {
+    query = `${withClause} SELECT * FROM GetCountries`;
+  } else if (countryIds.length && timeframe === "daily") {
+    query = `${withClause}
+      , ByDate AS (
+        SELECT Country_ID, Country, Date_ AS "DD-MON-YY", ROUND(AVG(Stock), 2) AS Average_Dow_Jones_Closing_Price, 
+        ROUND(AVG(StringencyIndex), 2) AS Average_Stringency_Index, ROUND(AVG(CasesPerMil), 2) AS Average_Covid_Cases_Per_Million
+        FROM Query1
+        WHERE Country_ID IN (${countryIds.map((id) => `'${id}'`).join(", ")})
+        GROUP BY Country_ID, Country, Date_
+        ORDER BY Country_ID, Date_)
+      SELECT * FROM ByDate`;
+  } else if (countryIds.length && timeframe === "weekly") {
+    query = `${withClause}
+      , ByWeek AS (
+        SELECT Country_ID, Country, Yr_Week AS "YYYY-WW", ROUND(AVG(Stock), 2) AS Average_Dow_Jones_Closing_Price, 
+        ROUND(AVG(StringencyIndex), 2) AS Average_Stringency_Index, ROUND(AVG(CasesPerMil), 2) AS Average_Covid_Cases_Per_Million
+        FROM Query1
+        WHERE Country_ID IN (${countryIds.map((id) => `'${id}'`).join(", ")})
+        GROUP BY Country_ID, Country, Yr_Week
+        ORDER BY Country_ID, Yr_Week)
+      SELECT * FROM ByWeek`;
   } else {
-    query = `${withClause} SELECT * FROM ByMonth`;
+    // Default to monthly if not daily or weekly
+    query = `${withClause}
+      , ByMonth AS (
+        SELECT Country_ID, Country, Yr_Month AS "YYYY-MM", ROUND(AVG(Stock), 2) AS Average_Dow_Jones_Closing_Price, 
+        ROUND(AVG(StringencyIndex), 2) AS Average_Stringency_Index, ROUND(AVG(CasesPerMil), 2) AS Average_Covid_Cases_Per_Million
+        FROM Query1
+        WHERE Country_ID IN (${countryIds.map((id) => `'${id}'`).join(", ")})
+        GROUP BY Country_ID, Country, Yr_Month
+        ORDER BY Country_ID, Yr_Month)
+      SELECT * FROM ByMonth`;
   }
 
   let connection;
@@ -508,8 +529,8 @@ app.get("/query5", async (req, res) => {
     switch (timeframe) {
       case "daily":
         timeframeQuery = `, ByDate AS (
-            SELECT CountryID, Country, AlcoholRiskCategory AS Alcohol_Risk_Level, DiabetesRiskCategory AS Diabetes_Risk_Level, Aged65OlderRiskCategory AS Aged_65_Older_Risk_Level, GDPRiskCategory AS GDP_Risk_Level, PopDenseRiskCategory AS Population_Density_Risk_Level, 
-            SmokingRiskCategory AS Smoking_Risk_Level, ObesityRiskCategory AS Obesity_Risk_Level, Date_ AS "DD-MON-YY", ROUND(AVG(CasesPerMil), 2) AS Average_Cases_Per_Million, ROUND(AVG(DeathsPerMil), 2) AS Average_Deaths_Per_Million, ROUND(AVG(VaccsPerMil), 2) AS Average_Vaccinations_Per_Million
+            SELECT CountryID, Country, Date_ AS "DD-MON-YY", AlcoholRiskCategory AS Alcohol_Risk_Level, DiabetesRiskCategory AS Diabetes_Risk_Level, Aged65OlderRiskCategory AS Aged_65_Older_Risk_Level, GDPRiskCategory AS GDP_Risk_Level, PopDenseRiskCategory AS Population_Density_Risk_Level, 
+            SmokingRiskCategory AS Smoking_Risk_Level, ObesityRiskCategory AS Obesity_Risk_Level, ROUND(AVG(CasesPerMil), 2) AS Average_Cases_Per_Million, ROUND(AVG(DeathsPerMil), 2) AS Average_Deaths_Per_Million, ROUND(AVG(VaccsPerMil), 2) AS Average_Vaccinations_Per_Million
             FROM FinalTable
             WHERE CountryID IN (${countryIds.map((id) => `'${id}'`).join(", ")})
             GROUP BY CountryID, Country, AlcoholRiskCategory, DiabetesRiskCategory, Aged65OlderRiskCategory, GDPRiskCategory, PopDenseRiskCategory, SmokingRiskCategory, ObesityRiskCategory, Date_
@@ -518,8 +539,8 @@ app.get("/query5", async (req, res) => {
         break;
       case "weekly":
         timeframeQuery = `, ByWeek AS (
-            SELECT CountryID, Country, AlcoholRiskCategory AS Alcohol_Risk_Level, DiabetesRiskCategory AS Diabetes_Risk_Level, Aged65OlderRiskCategory AS Aged_65_Older_Risk_Level, GDPRiskCategory AS GDP_Risk_Level, PopDenseRiskCategory AS Population_Density_Risk_Level, 
-            SmokingRiskCategory AS Smoking_Risk_Level, ObesityRiskCategory AS Obesity_Risk_Level, Yr_Week AS "YYYY-WW", ROUND(AVG(CasesPerMil), 2) AS Average_Cases_Per_Million, ROUND(AVG(DeathsPerMil), 2) AS Average_Deaths_Per_Million, ROUND(AVG(VaccsPerMil), 2) AS Average_Vaccinations_Per_Million
+            SELECT CountryID, Country, Yr_Week AS "YYYY-WW", AlcoholRiskCategory AS Alcohol_Risk_Level, DiabetesRiskCategory AS Diabetes_Risk_Level, Aged65OlderRiskCategory AS Aged_65_Older_Risk_Level, GDPRiskCategory AS GDP_Risk_Level, PopDenseRiskCategory AS Population_Density_Risk_Level, 
+            SmokingRiskCategory AS Smoking_Risk_Level, ObesityRiskCategory AS Obesity_Risk_Level, ROUND(AVG(CasesPerMil), 2) AS Average_Cases_Per_Million, ROUND(AVG(DeathsPerMil), 2) AS Average_Deaths_Per_Million, ROUND(AVG(VaccsPerMil), 2) AS Average_Vaccinations_Per_Million
             FROM FinalTable
             WHERE CountryID IN (${countryIds.map((id) => `'${id}'`).join(", ")})
             GROUP BY CountryID, Country, AlcoholRiskCategory, DiabetesRiskCategory, Aged65OlderRiskCategory, GDPRiskCategory, PopDenseRiskCategory, SmokingRiskCategory, ObesityRiskCategory, Yr_Week
@@ -529,8 +550,8 @@ app.get("/query5", async (req, res) => {
       default:
         // Default to monthly
         timeframeQuery = `, ByMonth AS (
-            SELECT CountryID, Country, AlcoholRiskCategory AS Alcohol_Risk_Level, DiabetesRiskCategory AS Diabetes_Risk_Level, Aged65OlderRiskCategory AS Aged_65_Older_Risk_Level, GDPRiskCategory AS GDP_Risk_Level, PopDenseRiskCategory AS Population_Density_Risk_Level, 
-            SmokingRiskCategory AS Smoking_Risk_Level, ObesityRiskCategory AS Obesity_Risk_Level, Yr_Month AS "YYYY-MM", ROUND(AVG(CasesPerMil), 2) AS Average_Cases_Per_Million, ROUND(AVG(DeathsPerMil), 2) AS Average_Deaths_Per_Million, ROUND(AVG(VaccsPerMil), 2) AS Average_Vaccinations_Per_Million
+            SELECT CountryID, Country, Yr_Month AS "YYYY-MM", AlcoholRiskCategory AS Alcohol_Risk_Level, DiabetesRiskCategory AS Diabetes_Risk_Level, Aged65OlderRiskCategory AS Aged_65_Older_Risk_Level, GDPRiskCategory AS GDP_Risk_Level, PopDenseRiskCategory AS Population_Density_Risk_Level, 
+            SmokingRiskCategory AS Smoking_Risk_Level, ObesityRiskCategory AS Obesity_Risk_Level, ROUND(AVG(CasesPerMil), 2) AS Average_Cases_Per_Million, ROUND(AVG(DeathsPerMil), 2) AS Average_Deaths_Per_Million, ROUND(AVG(VaccsPerMil), 2) AS Average_Vaccinations_Per_Million
             FROM FinalTable
             WHERE CountryID IN (${countryIds.map((id) => `'${id}'`).join(", ")})
             GROUP BY CountryID, Country, AlcoholRiskCategory, DiabetesRiskCategory, Aged65OlderRiskCategory, GDPRiskCategory, PopDenseRiskCategory, SmokingRiskCategory, ObesityRiskCategory, Yr_Month
