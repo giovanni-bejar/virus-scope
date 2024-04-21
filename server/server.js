@@ -26,10 +26,10 @@ app.get("/query1", async (req, res) => {
       SELECT CInfo.Country_ID, CInfo.Name AS Country, New_Cases/(Population/1000000) AS CasesPerMil, Stats.Date_Info AS Date_, 
       TO_CHAR(Stats.Date_Info, 'YYYY-WW') AS Yr_Week, TO_CHAR(Stats.Date_Info, 'YYYY-MM') AS Yr_Month, 
       Dow_Jones_Closing AS Stock, Stringency_Index AS StringencyIndex
-      FROM tylerwescott.COVID_Statistics Stats
-      JOIN tylerwescott.Country_Info Cinfo ON Cinfo.Country_Id = Stats.Country_Id
-      JOIN tylerwescott.Public_Health_Measures HM ON Stats.Country_Id = HM.Country_Id AND Stats.Date_Info = HM.Date_Info
-      LEFT JOIN tylerwescott.Economic_Indicators Eco ON Eco.Date_Info = Stats.Date_Info AND Eco.Country_ID = stats.Country_Id
+      FROM tylerwescott.Country_Info Cinfo
+      LEFT JOIN tylerwescott.COVID_Statistics Stats ON Cinfo.Country_Id = Stats.Country_Id
+      LEFT JOIN tylerwescott.Public_Health_Measures HM ON Stats.Country_Id = HM.Country_Id AND Stats.Date_Info = HM.Date_Info
+      LEFT JOIN tylerwescott.Economic_Indicators Eco on Eco.Date_Info = Stats.Date_Info AND Eco.Country_ID = stats.Country_Id
     ),
     GetCountries AS (
       SELECT DISTINCT Country_ID, Country
@@ -109,9 +109,9 @@ app.get("/query2", async (req, res) => {
       SELECT CInfo.Country_ID, Cinfo.Name AS Country, Hosp_patients/(Population/1000000) AS HospPatsPerMil, ICU_patients/(Population/1000000) AS IcuPatsPerMil, New_cases/(Population/1000000) AS CasesPerMil, New_deaths/(Population/1000000) AS DeathsPerMil,
       CASE WHEN Icu_capacity IS NOT NULL AND Icu_capacity <> 0 THEN ROUND(Icu_patients/Icu_capacity, 2) END AS ICUcapRate,
       Hdata.Date_info AS D_Date, TO_CHAR(Hdata.Date_Info, 'YYYY-WW') AS Yr_Week, TO_CHAR(Hdata.Date_Info, 'YYYY-MM') AS Yr_Month
-      FROM tylerwescott.Health_Data Hdata
-      JOIN tylerwescott.COVID_Statistics Stats ON Stats.Country_id = Hdata.Country_id AND Stats.Date_info = Hdata.Date_info
-      JOIN tylerwescott.Country_Info Cinfo ON Cinfo.Country_ID = Hdata.Country_ID
+      FROM tylerwescott.Country_Info Cinfo
+      LEFT JOIN tylerwescott.Health_Data Hdata ON Cinfo.Country_ID = Hdata.Country_ID
+      LEFT JOIN tylerwescott.COVID_Statistics Stats on Stats.Country_id = Hdata.Country_id AND Stats.Date_info = Hdata.Date_info
     ),
     GetCountries AS (
       SELECT DISTINCT Country_ID, Country
@@ -195,83 +195,137 @@ app.get("/query3", async (req, res) => {
       SELECT Cinfo.Country_ID, Cinfo.Name AS Country, New_vaccinations/(Population/1000000) AS VaccsPerMil, Boosters_administered/(Population*1000000) AS BoostersPerMil, 
       New_Deaths/(Population/1000000) AS DeathsPerMil, People_fully_vaccinated, Total_deaths, Total_cases,
       Vax.Date_info AS Date_, TO_CHAR(Vax.DATE_INFO, 'YYYY-WW') AS Yr_Week, TO_CHAR(Vax.DATE_INFO, 'YYYY-MM') AS Yr_Month
-      FROM tylerwescott.Vaccination_Data Vax
-      JOIN tylerwescott.Country_Info Cinfo ON Cinfo.Country_id = Vax.Country_id
-      JOIN tylerwescott.COVID_Statistics Stats ON Stats.Country_id = Vax.Country_id AND Stats.Date_info = Vax.Date_info
+      FROM tylerwescott.Country_Info Cinfo
+      LEFT JOIN tylerwescott.Vaccination_Data Vax ON Cinfo.Country_id = Vax.Country_id
+      LEFT JOIN tylerwescott.COVID_Statistics Stats ON Stats.Country_id = Vax.Country_id AND Stats.Date_info = Vax.Date_info
     ),
     One(CountryCode1, Country1Date, Country1Pfizer, Country1Moderna, Country1OxfordAstraZeneca, Country1SinopharmBeijing, Country1JohnsonJohnson,
-    Country1Sinovac, Country1Sputnikv ) 
-    AS (
-    SELECT Country_ID, Date_Info, Pfizer_Administered,  Moderna_Administered, OxfordAstraZeneca_Administered, SinopharmBeijing_Administered,
-    JohnsonJohnson_Administered, Sinovac_Administered, Sputnikv_Administered 
-    FROM tylerwescott.Vaccination_Data
-    ),
-
-    Two (CountryCode2, Country2Date, Country2Pfizer, Country2Moderna, Country2OxfordAstraZeneca, Country2SinopharmBeijing, Country2JohnsonJohnson,
-    Country2Sinovac, Country2Sputnikv) 
-    AS (
-    SELECT Country_ID, Date_Info, Pfizer_Administered, Moderna_Administered, OxfordAstraZeneca_Administered, SinopharmBeijing_Administered,
-    JohnsonJohnson_Administered, Sinovac_Administered, Sputnikv_Administered 
-    FROM tylerwescott.Vaccination_Data
-    ),
-
-    Manufacturer (CountryCode1, Country1Date, CountryCode2, Country2Date, Country1Pfizer, Country2Pfizer, ActualPfizer, 
-    Country1Moderna, Country2Moderna, ActualModerna, Country1OxfordAstraZeneca, Country2OxfordAstraZeneca, ActualOxfordAstraZeneca,
-    Country1SinopharmBeijing, Country2SinopharmBeijing, ActualSinopharmBeijing, Country1JohnsonJohnson, Country2JohnsonJohnson, 
-    ActualJohnsonJohnson, Country1Sinovac, Country2Sinovac, ActualSinovac, Country1Sputnikv, Country2Sputnikv, ActualSputnikv) 
-    AS (
-    SELECT CountryCode1, Country1Date, CountryCode2, Country2Date, 
-    --Pfizer
-    Country1Pfizer, Country2Pfizer,
-    CASE WHEN Country2Pfizer = 0 THEN 0
-    ELSE Country2Pfizer - Country1Pfizer
-    END AS ActualPfizer,
-    --Moderna
-    Country1Moderna, Country2Moderna, 
-    CASE WHEN Country2Moderna = 0 THEN 0
-    ELSE Country2Moderna - Country1Moderna 
-    END AS ActualModerna,
-    --OxfordAstraZeneca
-    Country1OxfordAstraZeneca, Country2OxfordAstraZeneca,
-    CASE WHEN Country2OxfordAstraZeneca = 0 THEN 0
-    ELSE Country2OxfordAstraZeneca - Country1OxfordAstraZeneca
-    END AS ActualOxfordAstraZeneca,
-    --SinopharmBeijing
-    Country1SinopharmBeijing, Country2SinopharmBeijing, 
-    CASE WHEN Country2SinopharmBeijing = 0 THEN 0
-    ELSE Country2SinopharmBeijing - Country1SinopharmBeijing
-    END AS ActualSinopharmBeijing,
-    --JohnsonJohnson
-    Country1JohnsonJohnson, Country2JohnsonJohnson, 
-    CASE WHEN Country2JohnsonJohnson = 0 THEN 0
-    ELSE Country2JohnsonJohnson - Country1JohnsonJohnson
-    END AS ActualJohnsonJohnson,
-    --Sinovac
-    Country1Sinovac, Country2Sinovac,
-    CASE WHEN Country2Sinovac = 0 THEN 0
-    ELSE Country2Sinovac - Country1Sinovac
-    END AS ActualSinovac,
-    --Sputnikv
-    Country1Sputnikv, Country2Sputnikv,
-    CASE WHEN Country2Sputnikv = 0 THEN 0
-    ELSE Country2Sputnikv  - Country1Sputnikv
-    END AS ActualSputnikv
-
-    FROM One, Two
-    WHERE CountryCode1 = CountryCode2 AND Country1Date+1 = Country2Date
-    ),
-
-    Final (Country_ID, Country, VaccsPerMil, BoostersPerMil, DeathsPerMil, People_Fully_Vaccinated, Total_Deaths, Total_Cases, Date_, Yr_Week,
-    Yr_Month, PfizerPerMil, ModernaPerMil, OxfordAstraZenecaPerMil, SinoPharmBeijingPerMil, JohnsonJohnsonPerMil, SinovacPerMil, SputnikvPerMil) 
-    AS (
-    SELECT Cinfo.Country_ID, Country, VaccsPerMil, BoostersPerMil, DeathsPerMil, People_Fully_Vaccinated, Total_Deaths, Total_Cases, Date_, Yr_Week,
-    Yr_Month, ActualPfizer/(Population/1000000), ActualModerna/(Population/1000000), ActualOxfordAstraZeneca/(Population/1000000), 
-    ActualSinoPharmBeijing/(Population/1000000), ActualJohnsonJohnson/(Population/1000000), ActualSinovac/(Population/1000000), 
-    ActualSputnikv/(Population/1000000)
-    FROM Query3
-    JOIN Manufacturer ON Manufacturer.CountryCode1 = Query3.Country_ID AND Manufacturer.Country1Date = Query3.Date_
-    JOIN tylerwescott.Country_Info Cinfo ON Cinfo.Country_id = Query3.Country_id
-    ),
+      Country1Sinovac, Country1Sputnikv ) 
+      AS (
+      SELECT Country_ID, Date_Info, Pfizer_Administered,  Moderna_Administered, OxfordAstraZeneca_Administered, SinopharmBeijing_Administered,
+      JohnsonJohnson_Administered, Sinovac_Administered, Sputnikv_Administered 
+      FROM tylerwescott.Vaccination_Data),
+      
+      Two (CountryCode2, Country2Date, Country2Pfizer, Country2Moderna, Country2OxfordAstraZeneca, Country2SinopharmBeijing, Country2JohnsonJohnson,
+      Country2Sinovac, Country2Sputnikv) 
+      AS (
+      SELECT Country_ID, Date_Info, Pfizer_Administered, Moderna_Administered, OxfordAstraZeneca_Administered, SinopharmBeijing_Administered,
+      JohnsonJohnson_Administered, Sinovac_Administered, Sputnikv_Administered 
+      FROM tylerwescott.Vaccination_Data),
+      
+      Manufacturer (CountryCode1, Country1Date, CountryCode2, Country2Date, Country1Pfizer, Country2Pfizer, ActualPfizer, 
+      Country1Moderna, Country2Moderna, ActualModerna, Country1OxfordAstraZeneca, Country2OxfordAstraZeneca, ActualOxfordAstraZeneca,
+      Country1SinopharmBeijing, Country2SinopharmBeijing, ActualSinopharmBeijing, Country1JohnsonJohnson, Country2JohnsonJohnson, 
+      ActualJohnsonJohnson, Country1Sinovac, Country2Sinovac, ActualSinovac, Country1Sputnikv, Country2Sputnikv, ActualSputnikv) 
+      AS (
+      SELECT CountryCode1, Country1Date, CountryCode2, Country2Date, 
+      --Pfizer
+      Country1Pfizer, Country2Pfizer,
+      CASE WHEN Country2Pfizer = 0 THEN 0
+      ELSE Country2Pfizer - Country1Pfizer
+      END AS ActualPfizer,
+      --Moderna
+      Country1Moderna, Country2Moderna, 
+      CASE WHEN Country2Moderna = 0 THEN 0
+      ELSE Country2Moderna - Country1Moderna 
+      END AS ActualModerna,
+      --OxfordAstraZeneca
+      Country1OxfordAstraZeneca, Country2OxfordAstraZeneca,
+      CASE WHEN Country2OxfordAstraZeneca = 0 THEN 0
+      ELSE Country2OxfordAstraZeneca - Country1OxfordAstraZeneca
+      END AS ActualOxfordAstraZeneca,
+      --SinopharmBeijing
+      Country1SinopharmBeijing, Country2SinopharmBeijing, 
+      CASE WHEN Country2SinopharmBeijing = 0 THEN 0
+      ELSE Country2SinopharmBeijing - Country1SinopharmBeijing
+      END AS ActualSinopharmBeijing,
+      --JohnsonJohnson
+      Country1JohnsonJohnson, Country2JohnsonJohnson, 
+      CASE WHEN Country2JohnsonJohnson = 0 THEN 0
+      ELSE Country2JohnsonJohnson - Country1JohnsonJohnson
+      END AS ActualJohnsonJohnson,
+      --Sinovac
+      Country1Sinovac, Country2Sinovac,
+      CASE WHEN Country2Sinovac = 0 THEN 0
+      ELSE Country2Sinovac - Country1Sinovac
+      END AS ActualSinovac,
+      --Sputnikv
+      Country1Sputnikv, Country2Sputnikv,
+      CASE WHEN Country2Sputnikv = 0 THEN 0
+      ELSE Country2Sputnikv  - Country1Sputnikv
+      END AS ActualSputnikv
+      
+      FROM One, Two
+      WHERE CountryCode1 = CountryCode2 AND Country1Date+1 = Country2Date),
+      
+      Manufacturer2 (CountryCode1, Country1Date, CountryCode2, Country2Date, Country1Pfizer, Country2Pfizer, ActualPfizer, 
+      Country1Moderna, Country2Moderna, ActualModerna, Country1OxfordAstraZeneca, Country2OxfordAstraZeneca, ActualOxfordAstraZeneca,
+      Country1SinopharmBeijing, Country2SinopharmBeijing, ActualSinopharmBeijing, Country1JohnsonJohnson, Country2JohnsonJohnson, 
+      ActualJohnsonJohnson, Country1Sinovac, Country2Sinovac, ActualSinovac, Country1Sputnikv, Country2Sputnikv, ActualSputnikv) 
+      AS (
+      SELECT CountryCode1, Country1Date, CountryCode2, Country2Date, 
+      --Pfizer
+      Country1Pfizer, Country2Pfizer,
+      CASE WHEN Country2Pfizer = 0 THEN 0
+      ELSE Country2Pfizer - Country1Pfizer
+      END AS ActualPfizer,
+      --Moderna
+      Country1Moderna, Country2Moderna, 
+      CASE WHEN Country2Moderna = 0 THEN 0
+      ELSE Country2Moderna - Country1Moderna 
+      END AS ActualModerna,
+      --OxfordAstraZeneca
+      Country1OxfordAstraZeneca, Country2OxfordAstraZeneca,
+      CASE WHEN Country2OxfordAstraZeneca = 0 THEN 0
+      ELSE Country2OxfordAstraZeneca - Country1OxfordAstraZeneca
+      END AS ActualOxfordAstraZeneca,
+      --SinopharmBeijing
+      Country1SinopharmBeijing, Country2SinopharmBeijing, 
+      CASE WHEN Country2SinopharmBeijing = 0 THEN 0
+      ELSE Country2SinopharmBeijing - Country1SinopharmBeijing
+      END AS ActualSinopharmBeijing,
+      --JohnsonJohnson
+      Country1JohnsonJohnson, Country2JohnsonJohnson, 
+      CASE WHEN Country2JohnsonJohnson = 0 THEN 0
+      ELSE Country2JohnsonJohnson - Country1JohnsonJohnson
+      END AS ActualJohnsonJohnson,
+      --Sinovac
+      Country1Sinovac, Country2Sinovac,
+      CASE WHEN Country2Sinovac = 0 THEN 0
+      ELSE Country2Sinovac - Country1Sinovac
+      END AS ActualSinovac,
+      --Sputnikv
+      Country1Sputnikv, Country2Sputnikv,
+      CASE WHEN Country2Sputnikv = 0 THEN 0
+      ELSE Country2Sputnikv  - Country1Sputnikv
+      END AS ActualSputnikv
+      
+      FROM One, Two
+      WHERE CountryCode1 = CountryCode2 AND Country1Date+7 = Country2Date 
+      AND CountryCode1 NOT IN (SELECT DISTINCT CountryCode1 FROM Manufacturer)),
+      
+      ManufacturerUnion (CountryCode1, Country1Date, CountryCode2, Country2Date, Country1Pfizer, Country2Pfizer, ActualPfizer, 
+      Country1Moderna, Country2Moderna, ActualModerna, Country1OxfordAstraZeneca, Country2OxfordAstraZeneca, ActualOxfordAstraZeneca,
+      Country1SinopharmBeijing, Country2SinopharmBeijing, ActualSinopharmBeijing, Country1JohnsonJohnson, Country2JohnsonJohnson, 
+      ActualJohnsonJohnson, Country1Sinovac, Country2Sinovac, ActualSinovac, Country1Sputnikv, Country2Sputnikv, ActualSputnikv) AS (
+      
+      SELECT * FROM Manufacturer
+      UNION
+      SELECT * FROM Manufacturer2),
+      
+      --select distinct country from query3 where query3.country_id not in (select distinct countrycode1 from manufacturer)
+      
+      Final (Country_ID, Country, VaccsPerMil, BoostersPerMil, DeathsPerMil, People_Fully_Vaccinated, Total_Deaths, Total_Cases, Date_, Yr_Week,
+      Yr_Month, PfizerPerMil, ModernaPerMil, OxfordAstraZenecaPerMil, SinoPharmBeijingPerMil, JohnsonJohnsonPerMil, SinovacPerMil, SputnikvPerMil) AS (
+      
+      SELECT Cinfo.Country_ID, Country, VaccsPerMil, BoostersPerMil, DeathsPerMil, People_Fully_Vaccinated, Total_Deaths, Total_Cases, Date_, Yr_Week,
+      Yr_Month, ActualPfizer/(Population/1000000), ActualModerna/(Population/1000000), ActualOxfordAstraZeneca/(Population/1000000), 
+      ActualSinoPharmBeijing/(Population/1000000), ActualJohnsonJohnson/(Population/1000000), ActualSinovac/(Population/1000000), 
+      ActualSputnikv/(Population/1000000)
+      FROM Query3
+      JOIN tylerwescott.Country_Info Cinfo on Cinfo.Country_id = Query3.Country_id
+      LEFT JOIN ManufacturerUnion ON ManufacturerUnion.CountryCode1 = Query3.Country_ID AND ManufacturerUnion.Country1Date = Query3.Date_
+      ),      
 
     GetCountries AS (
     SELECT DISTINCT Country_ID, Country
@@ -334,8 +388,6 @@ app.get("/query3", async (req, res) => {
         ORDER BY Country_ID, Yr_Month)
       SELECT * FROM ByMonth`;
   }
-
-  console.log("Executing SQL Query:", query);
 
   let connection;
 
@@ -506,7 +558,7 @@ app.get("/query5", async (req, res) => {
       FROM RiskCategories
       JOIN tylerwescott.Country_Info ON RiskCategories.CountryID = Country_Info.Country_ID
       JOIN tylerwescott.COVID_Statistics ON COVID_Statistics.Country_ID = Country_Info.Country_ID
-      JOIN tylerwescott.Vaccination_Data ON Vaccination_Data.Country_ID = COVID_Statistics.Country_ID AND Vaccination_Data.Date_Info = COVID_Statistics.Date_Info
+      LEFT JOIN tylerwescott.Vaccination_Data ON Vaccination_Data.Country_ID = COVID_Statistics.Country_ID AND Vaccination_Data.Date_Info = COVID_Statistics.Date_Info
     ),
     GetCountries AS (
       SELECT DISTINCT CountryID, Country
@@ -562,6 +614,48 @@ app.get("/query5", async (req, res) => {
 
     query = withClause + timeframeQuery;
   }
+
+  let connection;
+
+  try {
+    connection = await oracledb.getConnection(dbConfig);
+    const result = await connection.execute(query);
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error fetching data from OracleDB");
+  } finally {
+    if (connection) {
+      try {
+        await connection.close();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  }
+});
+
+// Query Tuples API CALLS - COMPLETE
+app.get("/tuples", async (req, res) => {
+  const query = `
+    WITH TCount (TableCount) AS (
+      SELECT COUNT(*) FROM tylerwescott.Country_Info
+      UNION ALL
+      SELECT COUNT(*) FROM tylerwescott.COVID_Statistics
+      UNION ALL
+      SELECT COUNT(*) FROM tylerwescott.Public_Health_Measures
+      UNION ALL
+      SELECT COUNT(*) FROM tylerwescott.Economic_Indicators
+      UNION ALL
+      SELECT COUNT(*) FROM tylerwescott.Health_Data
+      UNION ALL
+      SELECT COUNT(*) FROM tylerwescott.Vaccination_Data
+      UNION ALL
+      SELECT COUNT(*) FROM tylerwescott.Risk_Factors
+    )
+    SELECT SUM(TableCount) AS Total_Tuples_In_Database 
+    FROM TCount
+  `;
 
   let connection;
 
