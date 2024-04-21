@@ -16,7 +16,7 @@ export default function Signup() {
     try {
       const signupResult = await userEmailSignup(email, password, displayName);
       if (signupResult === "success") {
-        router.push("/query");
+        router.push("/");
       } else {
         console.error(signupResult);
       }
