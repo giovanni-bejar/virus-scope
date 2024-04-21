@@ -189,149 +189,59 @@ app.get("/query3", async (req, res) => {
   const { countryId, timeframe, getCountries } = req.query;
   let query;
 
-  // Base WITH clause for all queries
+  // Full WITH clause for all queries
   const withClause = `
     WITH Query3 AS (
-      SELECT Cinfo.Country_ID, Cinfo.Name AS Country, New_vaccinations/(Population/1000000) AS VaccsPerMil, Boosters_administered/(Population*1000000) AS BoostersPerMil, 
-      New_Deaths/(Population/1000000) AS DeathsPerMil, People_fully_vaccinated, Total_deaths, Total_cases,
-      Vax.Date_info AS Date_, TO_CHAR(Vax.DATE_INFO, 'YYYY-WW') AS Yr_Week, TO_CHAR(Vax.DATE_INFO, 'YYYY-MM') AS Yr_Month
+      SELECT Cinfo.Country_ID, Cinfo.Name AS Country, New_vaccinations/(Population/1000000) AS VaccsPerMil, New_cases/(Population/1000000) AS CasesPerMil,
+      New_Deaths/(Population/1000000) AS DeathsPerMil, People_fully_vaccinated, Total_deaths, Total_cases, Stats.Date_info AS Date_,
+      TO_CHAR(Stats.DATE_INFO, 'YYYY-WW') AS Yr_Week, TO_CHAR(Stats.DATE_INFO, 'YYYY-MM') AS Yr_Month
       FROM tylerwescott.Country_Info Cinfo
-      LEFT JOIN tylerwescott.Vaccination_Data Vax ON Cinfo.Country_id = Vax.Country_id
-      LEFT JOIN tylerwescott.COVID_Statistics Stats ON Stats.Country_id = Vax.Country_id AND Stats.Date_info = Vax.Date_info
+      JOIN tylerwescott.COVID_Statistics Stats ON Stats.Country_ID = Cinfo.Country_ID
+      LEFT JOIN tylerwescott.Vaccination_Data Vax ON Cinfo.Country_id = Vax.Country_id AND Stats.Date_info = Vax.Date_info
+      WHERE Stats.Date_info >= '01-JAN-21'
     ),
-    One(CountryCode1, Country1Date, Country1Pfizer, Country1Moderna, Country1OxfordAstraZeneca, Country1SinopharmBeijing, Country1JohnsonJohnson,
-      Country1Sinovac, Country1Sputnikv ) 
-      AS (
-      SELECT Country_ID, Date_Info, Pfizer_Administered,  Moderna_Administered, OxfordAstraZeneca_Administered, SinopharmBeijing_Administered,
-      JohnsonJohnson_Administered, Sinovac_Administered, Sputnikv_Administered 
-      FROM tylerwescott.Vaccination_Data),
-      
-      Two (CountryCode2, Country2Date, Country2Pfizer, Country2Moderna, Country2OxfordAstraZeneca, Country2SinopharmBeijing, Country2JohnsonJohnson,
-      Country2Sinovac, Country2Sputnikv) 
-      AS (
-      SELECT Country_ID, Date_Info, Pfizer_Administered, Moderna_Administered, OxfordAstraZeneca_Administered, SinopharmBeijing_Administered,
-      JohnsonJohnson_Administered, Sinovac_Administered, Sputnikv_Administered 
-      FROM tylerwescott.Vaccination_Data),
-      
-      Manufacturer (CountryCode1, Country1Date, CountryCode2, Country2Date, Country1Pfizer, Country2Pfizer, ActualPfizer, 
-      Country1Moderna, Country2Moderna, ActualModerna, Country1OxfordAstraZeneca, Country2OxfordAstraZeneca, ActualOxfordAstraZeneca,
-      Country1SinopharmBeijing, Country2SinopharmBeijing, ActualSinopharmBeijing, Country1JohnsonJohnson, Country2JohnsonJohnson, 
-      ActualJohnsonJohnson, Country1Sinovac, Country2Sinovac, ActualSinovac, Country1Sputnikv, Country2Sputnikv, ActualSputnikv) 
-      AS (
-      SELECT CountryCode1, Country1Date, CountryCode2, Country2Date, 
-      --Pfizer
-      Country1Pfizer, Country2Pfizer,
-      CASE WHEN Country2Pfizer = 0 THEN 0
-      ELSE Country2Pfizer - Country1Pfizer
-      END AS ActualPfizer,
-      --Moderna
-      Country1Moderna, Country2Moderna, 
-      CASE WHEN Country2Moderna = 0 THEN 0
-      ELSE Country2Moderna - Country1Moderna 
-      END AS ActualModerna,
-      --OxfordAstraZeneca
-      Country1OxfordAstraZeneca, Country2OxfordAstraZeneca,
-      CASE WHEN Country2OxfordAstraZeneca = 0 THEN 0
-      ELSE Country2OxfordAstraZeneca - Country1OxfordAstraZeneca
-      END AS ActualOxfordAstraZeneca,
-      --SinopharmBeijing
-      Country1SinopharmBeijing, Country2SinopharmBeijing, 
-      CASE WHEN Country2SinopharmBeijing = 0 THEN 0
-      ELSE Country2SinopharmBeijing - Country1SinopharmBeijing
-      END AS ActualSinopharmBeijing,
-      --JohnsonJohnson
-      Country1JohnsonJohnson, Country2JohnsonJohnson, 
-      CASE WHEN Country2JohnsonJohnson = 0 THEN 0
-      ELSE Country2JohnsonJohnson - Country1JohnsonJohnson
-      END AS ActualJohnsonJohnson,
-      --Sinovac
-      Country1Sinovac, Country2Sinovac,
-      CASE WHEN Country2Sinovac = 0 THEN 0
-      ELSE Country2Sinovac - Country1Sinovac
-      END AS ActualSinovac,
-      --Sputnikv
-      Country1Sputnikv, Country2Sputnikv,
-      CASE WHEN Country2Sputnikv = 0 THEN 0
-      ELSE Country2Sputnikv  - Country1Sputnikv
-      END AS ActualSputnikv
-      
+    One AS (
+      SELECT Country_ID AS CountryCode1, Date_Info AS Country1Date, Pfizer_Administered AS Country1Pfizer, Moderna_Administered AS Country1Moderna, 
+      OxfordAstraZeneca_Administered AS Country1OxfordAstraZeneca, SinopharmBeijing_Administered AS Country1SinopharmBeijing, 
+      JohnsonJohnson_Administered AS Country1JohnsonJohnson, Sinovac_Administered AS Country1Sinovac, 
+      Sputnikv_Administered AS Country1Sputnikv, Total_Boosters AS Country1Boosters
+      FROM tylerwescott.Vaccination_Data
+    ),
+    Two AS (
+      SELECT Country_ID AS CountryCode2, Date_Info AS Country2Date, Pfizer_Administered AS Country2Pfizer, Moderna_Administered AS Country2Moderna, 
+      OxfordAstraZeneca_Administered AS Country2OxfordAstraZeneca, SinopharmBeijing_Administered AS Country2SinopharmBeijing, 
+      JohnsonJohnson_Administered AS Country2JohnsonJohnson, Sinovac_Administered AS Country2Sinovac, 
+      Sputnikv_Administered AS Country2Sputnikv, Total_Boosters AS Country2Boosters
+      FROM tylerwescott.Vaccination_Data
+    ),
+    Manufacturer AS (
+      SELECT CountryCode1, Country1Date, CountryCode2, Country2Date,
+        Country1Pfizer, Country2Pfizer, CASE WHEN Country2Pfizer = 0 THEN 0 ELSE Country2Pfizer - Country1Pfizer END AS ActualPfizer,
+        Country1Moderna, Country2Moderna, CASE WHEN Country2Moderna = 0 THEN 0 ELSE Country2Moderna - Country1Moderna END AS ActualModerna,
+        Country1OxfordAstraZeneca, Country2OxfordAstraZeneca, CASE WHEN Country2OxfordAstraZeneca = 0 THEN 0 ELSE Country2OxfordAstraZeneca - Country1OxfordAstraZeneca END AS ActualOxfordAstraZeneca,
+        Country1SinopharmBeijing, Country2SinopharmBeijing, CASE WHEN Country2SinopharmBeijing = 0 THEN 0 ELSE Country2SinopharmBeijing - Country1SinopharmBeijing END AS ActualSinopharmBeijing,
+        Country1JohnsonJohnson, Country2JohnsonJohnson, CASE WHEN Country2JohnsonJohnson = 0 THEN 0 ELSE Country2JohnsonJohnson - Country1JohnsonJohnson END AS ActualJohnsonJohnson,
+        Country1Sinovac, Country2Sinovac, CASE WHEN Country2Sinovac = 0 THEN 0 ELSE Country2Sinovac - Country1Sinovac END AS ActualSinovac,
+        Country1Sputnikv, Country2Sputnikv, CASE WHEN Country2Sputnikv = 0 THEN 0 ELSE Country2Sputnikv - Country1Sputnikv END AS ActualSputnikv,
+        Country1Boosters, Country2Boosters, CASE WHEN Country2Boosters = 0 THEN 0 ELSE Country2Boosters - Country1Boosters END AS ActualBoosters
       FROM One, Two
-      WHERE CountryCode1 = CountryCode2 AND Country1Date+1 = Country2Date),
-      
-      Manufacturer2 (CountryCode1, Country1Date, CountryCode2, Country2Date, Country1Pfizer, Country2Pfizer, ActualPfizer, 
-      Country1Moderna, Country2Moderna, ActualModerna, Country1OxfordAstraZeneca, Country2OxfordAstraZeneca, ActualOxfordAstraZeneca,
-      Country1SinopharmBeijing, Country2SinopharmBeijing, ActualSinopharmBeijing, Country1JohnsonJohnson, Country2JohnsonJohnson, 
-      ActualJohnsonJohnson, Country1Sinovac, Country2Sinovac, ActualSinovac, Country1Sputnikv, Country2Sputnikv, ActualSputnikv) 
-      AS (
-      SELECT CountryCode1, Country1Date, CountryCode2, Country2Date, 
-      --Pfizer
-      Country1Pfizer, Country2Pfizer,
-      CASE WHEN Country2Pfizer = 0 THEN 0
-      ELSE Country2Pfizer - Country1Pfizer
-      END AS ActualPfizer,
-      --Moderna
-      Country1Moderna, Country2Moderna, 
-      CASE WHEN Country2Moderna = 0 THEN 0
-      ELSE Country2Moderna - Country1Moderna 
-      END AS ActualModerna,
-      --OxfordAstraZeneca
-      Country1OxfordAstraZeneca, Country2OxfordAstraZeneca,
-      CASE WHEN Country2OxfordAstraZeneca = 0 THEN 0
-      ELSE Country2OxfordAstraZeneca - Country1OxfordAstraZeneca
-      END AS ActualOxfordAstraZeneca,
-      --SinopharmBeijing
-      Country1SinopharmBeijing, Country2SinopharmBeijing, 
-      CASE WHEN Country2SinopharmBeijing = 0 THEN 0
-      ELSE Country2SinopharmBeijing - Country1SinopharmBeijing
-      END AS ActualSinopharmBeijing,
-      --JohnsonJohnson
-      Country1JohnsonJohnson, Country2JohnsonJohnson, 
-      CASE WHEN Country2JohnsonJohnson = 0 THEN 0
-      ELSE Country2JohnsonJohnson - Country1JohnsonJohnson
-      END AS ActualJohnsonJohnson,
-      --Sinovac
-      Country1Sinovac, Country2Sinovac,
-      CASE WHEN Country2Sinovac = 0 THEN 0
-      ELSE Country2Sinovac - Country1Sinovac
-      END AS ActualSinovac,
-      --Sputnikv
-      Country1Sputnikv, Country2Sputnikv,
-      CASE WHEN Country2Sputnikv = 0 THEN 0
-      ELSE Country2Sputnikv  - Country1Sputnikv
-      END AS ActualSputnikv
-      
-      FROM One, Two
-      WHERE CountryCode1 = CountryCode2 AND Country1Date+7 = Country2Date 
-      AND CountryCode1 NOT IN (SELECT DISTINCT CountryCode1 FROM Manufacturer)),
-      
-      ManufacturerUnion (CountryCode1, Country1Date, CountryCode2, Country2Date, Country1Pfizer, Country2Pfizer, ActualPfizer, 
-      Country1Moderna, Country2Moderna, ActualModerna, Country1OxfordAstraZeneca, Country2OxfordAstraZeneca, ActualOxfordAstraZeneca,
-      Country1SinopharmBeijing, Country2SinopharmBeijing, ActualSinopharmBeijing, Country1JohnsonJohnson, Country2JohnsonJohnson, 
-      ActualJohnsonJohnson, Country1Sinovac, Country2Sinovac, ActualSinovac, Country1Sputnikv, Country2Sputnikv, ActualSputnikv) AS (
-      
+      WHERE CountryCode1 = CountryCode2 AND Country1Date + INTERVAL '1' DAY = Country2Date
+    ),
+    ManufacturerUnion AS (
       SELECT * FROM Manufacturer
-      UNION
-      SELECT * FROM Manufacturer2),
-      
-      --select distinct country from query3 where query3.country_id not in (select distinct countrycode1 from manufacturer)
-      
-      Final (Country_ID, Country, VaccsPerMil, BoostersPerMil, DeathsPerMil, People_Fully_Vaccinated, Total_Deaths, Total_Cases, Date_, Yr_Week,
-      Yr_Month, PfizerPerMil, ModernaPerMil, OxfordAstraZenecaPerMil, SinoPharmBeijingPerMil, JohnsonJohnsonPerMil, SinovacPerMil, SputnikvPerMil) AS (
-      
-      SELECT Cinfo.Country_ID, Country, VaccsPerMil, BoostersPerMil, DeathsPerMil, People_Fully_Vaccinated, Total_Deaths, Total_Cases, Date_, Yr_Week,
-      Yr_Month, ActualPfizer/(Population/1000000), ActualModerna/(Population/1000000), ActualOxfordAstraZeneca/(Population/1000000), 
-      ActualSinoPharmBeijing/(Population/1000000), ActualJohnsonJohnson/(Population/1000000), ActualSinovac/(Population/1000000), 
-      ActualSputnikv/(Population/1000000)
+      UNION ALL
+      SELECT * FROM Manufacturer WHERE CountryCode1 = CountryCode2 AND Country1Date + INTERVAL '7' DAY = Country2Date 
+      AND CountryCode1 NOT IN (SELECT DISTINCT CountryCode1 FROM Manufacturer)
+    ),
+    Final AS (
+      SELECT Cinfo.Country_ID, Country, VaccsPerMil, CasesPerMil, DeathsPerMil, People_fully_vaccinated, Total_deaths, Total_cases, Date_, Yr_Week,
+      Yr_Month, ActualPfizer/(Population/1000000) AS PfizerPerMil, ActualModerna/(Population/1000000) AS ModernaPerMil, ActualOxfordAstraZeneca/(Population/1000000) AS OxfordAstraZenecaPerMil,
+      ActualSinoPharmBeijing/(Population/1000000) AS SinoPharmBeijingPerMil, ActualJohnsonJohnson/(Population/1000000) AS JohnsonJohnsonPerMil, ActualSinovac/(Population/1000000) AS SinovacPerMil,
+      ActualSputnikv/(Population/1000000) AS SputnikvPerMil, ActualBoosters/(Population/1000000) AS BoostersPerMil
       FROM Query3
-      JOIN tylerwescott.Country_Info Cinfo on Cinfo.Country_id = Query3.Country_id
+      JOIN tylerwescott.Country_Info Cinfo ON Cinfo.Country_id = Query3.Country_id
       LEFT JOIN ManufacturerUnion ON ManufacturerUnion.CountryCode1 = Query3.Country_ID AND ManufacturerUnion.Country1Date = Query3.Date_
-      ),      
-
-    GetCountries AS (
-    SELECT DISTINCT Country_ID, Country
-    FROM Query3
     )
-
   `;
 
   // Parse countryId into an array if it contains multiple countries
@@ -341,52 +251,65 @@ app.get("/query3", async (req, res) => {
     ? countryId.split(",")
     : [];
 
-  // If getCountries is true, fetch countries only
   if (getCountries) {
-    query = `${withClause} SELECT * FROM GetCountries`;
-  } else if (countryIds.length && timeframe === "daily") {
-    query = `${withClause}
-      , ByDate AS (
-        SELECT Country_ID, Country, Date_ AS "DD-MON-YY", ROUND(AVG(VaccsPerMil), 2) AS Average_Vaccnies_Per_Million,
-        ROUND(AVG(BoostersPerMil), 2) AS Average_Boosters_Per_Million, ROUND(AVG(PfizerPerMil), 2) AS Average_Pfizer_Vaccines_Per_Million,
-        ROUND(AVG(ModernaPerMil), 2) AS Average_Moderna_Vaccines_Per_Million, ROUND(AVG(OxfordAstraZenecaPerMil), 2) AS Average_OxfordAstraZeneca_Vaccines_Per_Million,
-        ROUND(AVG(SinoPharmBeijingPerMil), 2) AS Average_SinoPharmBeijing_Vaccines_Per_Million, ROUND(AVG(JohnsonJohnsonPerMil), 2) AS Average_JohnsonJohnson_Vaccines_Per_Million,
-        ROUND(AVG(SinovacPerMil), 2) AS Average_Sinovac_Per_Million, ROUND(AVG(SputnikvPerMil), 2) AS Average_Sputnikv_Vaccines_Per_Million,
-        MAX(People_Fully_Vaccinated) AS People_Fully_Vaccinated, MAX(Total_Deaths) AS Total_Deaths, MAX(Total_Cases) AS Total_Cases
-        FROM Final
-        WHERE Country_ID IN (${countryIds.map((id) => `'${id}'`).join(", ")})
-        GROUP BY Country_ID, Country, Date_
-        ORDER BY Country_ID, Date_)
-      SELECT * FROM ByDate`;
-  } else if (countryIds.length && timeframe === "weekly") {
-    query = `${withClause}
-      , ByWeek AS (
-        SELECT Country_ID, Country, Yr_Week AS "YYYY-WW", ROUND(AVG(VaccsPerMil), 2) AS Average_Vaccnies_Per_Million,
-        ROUND(AVG(BoostersPerMil), 2) AS Average_Boosters_Per_Million, ROUND(AVG(PfizerPerMil), 2) AS Average_Pfizer_Vaccines_Per_Million,
-        ROUND(AVG(ModernaPerMil), 2) AS Average_Moderna_Vaccines_Per_Million, ROUND(AVG(OxfordAstraZenecaPerMil), 2) AS Average_OxfordAstraZeneca_Vaccines_Per_Million,
-        ROUND(AVG(SinoPharmBeijingPerMil), 2) AS Average_SinoPharmBeijing_Vaccines_Per_Million, ROUND(AVG(JohnsonJohnsonPerMil), 2) AS Average_JohnsonJohnson_Vaccines_Per_Million,
-        ROUND(AVG(SinovacPerMil), 2) AS Average_Sinovac_Per_Million, ROUND(AVG(SputnikvPerMil), 2) AS Average_Sputnikv_Vaccines_Per_Million,
-        MAX(People_Fully_Vaccinated) AS People_Fully_Vaccinated, MAX(Total_Deaths) AS Total_Deaths, MAX(Total_Cases) AS Total_Cases
-        FROM Final
-        WHERE Country_ID IN (${countryIds.map((id) => `'${id}'`).join(", ")})
-        GROUP BY Country_ID, Country, Yr_Week
-        ORDER BY Country_ID, Yr_Week)
-      SELECT * FROM ByWeek`;
+    query = `${withClause} SELECT DISTINCT Country_ID, Country FROM Query3`;
   } else {
-    // Default to monthly
-    query = `${withClause}
-      , ByMonth AS (
-        SELECT Country_ID, Country, Yr_Month AS "YYYY-MM", ROUND(AVG(VaccsPerMil), 2) AS Average_Vaccnies_Per_Million,
-        ROUND(AVG(BoostersPerMil), 2) AS Average_Boosters_Per_Million, ROUND(AVG(PfizerPerMil), 2) AS Average_Pfizer_Vaccines_Per_Million,
-        ROUND(AVG(ModernaPerMil), 2) AS Average_Moderna_Vaccines_Per_Million, ROUND(AVG(OxfordAstraZenecaPerMil), 2) AS Average_OxfordAstraZeneca_Vaccines_Per_Million,
-        ROUND(AVG(SinoPharmBeijingPerMil), 2) AS Average_SinoPharmBeijing_Vaccines_Per_Million, ROUND(AVG(JohnsonJohnsonPerMil), 2) AS Average_JohnsonJohnson_Vaccines_Per_Million,
-        ROUND(AVG(SinovacPerMil), 2) AS Average_Sinovac_Per_Million, ROUND(AVG(SputnikvPerMil), 2) AS Average_Sputnikv_Vaccines_Per_Million,
-        MAX(People_Fully_Vaccinated) AS People_Fully_Vaccinated, MAX(Total_Deaths) AS Total_Deaths, MAX(Total_Cases) AS Total_Cases
-        FROM Final
-        WHERE Country_ID IN (${countryIds.map((id) => `'${id}'`).join(", ")})
-        GROUP BY Country_ID, Country, Yr_Month
-        ORDER BY Country_ID, Yr_Month)
-      SELECT * FROM ByMonth`;
+    // Additional filtering queries
+    const filterQuery =
+      countryIds.length > 0
+        ? `WHERE Country_ID IN (${countryIds
+            .map((id) => `'${id}'`)
+            .join(", ")})`
+        : "";
+    if (timeframe === "daily") {
+      query = `${withClause}
+        , ByDate AS (
+          SELECT Country_ID, Country, Date_ AS "DD-MON-YY", ROUND(AVG(VaccsPerMil), 2) AS Average_Vaccines_Per_Million,
+          ROUND(AVG(CasesPerMil), 2) AS Average_Cases_Per_Million, ROUND(AVG(DeathsPerMil), 2) AS Average_Deaths_Per_Million,
+          ROUND(AVG(PfizerPerMil), 2) AS Average_Pfizer_Vaccines_Per_Million, ROUND(AVG(ModernaPerMil), 2) AS Average_Moderna_Vaccines_Per_Million,
+          ROUND(AVG(OxfordAstraZenecaPerMil), 2) AS Average_OxfordAstraZeneca_Vaccines_Per_Million, ROUND(AVG(SinoPharmBeijingPerMil), 2) AS Average_SinoPharmBeijing_Vaccines_Per_Million,
+          ROUND(AVG(JohnsonJohnsonPerMil), 2) AS Average_JohnsonJohnson_Vaccines_Per_Million, ROUND(AVG(SinovacPerMil), 2) AS Average_Sinovac_Per_Million,
+          ROUND(AVG(SputnikvPerMil), 2) AS Average_Sputnikv_Vaccines_Per_Million, ROUND(AVG(BoostersPerMil), 2) AS Average_Boosters_Per_Million,
+          MAX(People_fully_vaccinated) AS People_Fully_Vaccinated, MAX(Total_deaths) AS Total_Deaths, MAX(Total_cases) AS Total_Cases
+          FROM Final
+          ${filterQuery}
+          GROUP BY Country_ID, Country, Date_
+          ORDER BY Country_ID, Date_
+        )
+        SELECT * FROM ByDate`;
+    } else if (timeframe === "weekly") {
+      query = `${withClause}
+        , ByWeek AS (
+          SELECT Country_ID, Country, Yr_Week AS "YYYY-WW", ROUND(AVG(VaccsPerMil), 2) AS Average_Vaccines_Per_Million,
+          ROUND(AVG(CasesPerMil), 2) AS Average_Cases_Per_Million, ROUND(AVG(DeathsPerMil), 2) AS Average_Deaths_Per_Million,
+          ROUND(AVG(PfizerPerMil), 2) AS Average_Pfizer_Vaccines_Per_Million, ROUND(AVG(ModernaPerMil), 2) AS Average_Moderna_Vaccines_Per_Million,
+          ROUND(AVG(OxfordAstraZenecaPerMil), 2) AS Average_OxfordAstraZeneca_Vaccines_Per_Million, ROUND(AVG(SinoPharmBeijingPerMil), 2) AS Average_SinoPharmBeijing_Vaccines_Per_Million,
+          ROUND(AVG(JohnsonJohnsonPerMil), 2) AS Average_JohnsonJohnson_Vaccines_Per_Million, ROUND(AVG(SinovacPerMil), 2) AS Average_Sinovac_Per_Million,
+          ROUND(AVG(SputnikvPerMil), 2) AS Average_Sputnikv_Vaccines_Per_Million, ROUND(AVG(BoostersPerMil), 2) AS Average_Boosters_Per_Million,
+          MAX(People_fully_vaccinated) AS People_Fully_Vaccinated, MAX(Total_deaths) AS Total_Deaths, MAX(Total_cases) AS Total_Cases
+          FROM Final
+          ${filterQuery}
+          GROUP BY Country_ID, Country, Yr_Week
+          ORDER BY Country_ID, Yr_Week
+        )
+        SELECT * FROM ByWeek`;
+    } else {
+      query = `${withClause}
+        , ByMonth AS (
+          SELECT Country_ID, Country, Yr_Month AS "YYYY-MM", ROUND(AVG(VaccsPerMil), 2) AS Average_Vaccines_Per_Million,
+          ROUND(AVG(CasesPerMil), 2) AS Average_Cases_Per_Million, ROUND(AVG(DeathsPerMil), 2) AS Average_Deaths_Per_Million,
+          ROUND(AVG(PfizerPerMil), 2) AS Average_Pfizer_Vaccines_Per_Million, ROUND(AVG(ModernaPerMil), 2) AS Average_Moderna_Vaccines_Per_Million,
+          ROUND(AVG(OxfordAstraZenecaPerMil), 2) AS Average_OxfordAstraZeneca_Vaccines_Per_Million, ROUND(AVG(SinoPharmBeijingPerMil), 2) AS Average_SinoPharmBeijing_Vaccines_Per_Million,
+          ROUND(AVG(JohnsonJohnsonPerMil), 2) AS Average_JohnsonJohnson_Vaccines_Per_Million, ROUND(AVG(SinovacPerMil), 2) AS Average_Sinovac_Per_Million,
+          ROUND(AVG(SputnikvPerMil), 2) AS Average_Sputnikv_Vaccines_Per_Million, ROUND(AVG(BoostersPerMil), 2) AS Average_Boosters_Per_Million,
+          MAX(People_fully_vaccinated) AS People_Fully_Vaccinated, MAX(Total_deaths) AS Total_Deaths, MAX(Total_cases) AS Total_Cases
+          FROM Final
+          ${filterQuery}
+          GROUP BY Country_ID, Country, Yr_Month
+          ORDER BY Country_ID, Yr_Month
+        )
+        SELECT * FROM ByMonth`;
+    }
   }
 
   let connection;
