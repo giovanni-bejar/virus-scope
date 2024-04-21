@@ -7,9 +7,7 @@ export default function Home() {
       <Header />
       <section className="flex flex-col max-w-3xl mx-auto mt-8 px-4">
         <div>
-          <h2 className="text-3xl font-bold mb-4 text-gray-800">
-            VirusScope Application and Query Overview
-          </h2>
+          <h2 className="text-3xl font-bold mb-4 text-gray-800">Virus Scope</h2>
           <p className="text-lg text-gray-700 leading-relaxed">
             CIS4301 Spring 2024 Group 07
             <br />
@@ -24,9 +22,6 @@ export default function Home() {
             Tyler Wescott
           </p>
         </div>
-        <p className="text-lg text-gray-700 leading-relaxed my-4">
-          Ovewview here
-        </p>
       </section>
     </main>
   );
