@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+"use client";
+
+import React, { useState, useEffect } from "react";
 import {
   LineChart,
   Line,
@@ -8,350 +10,279 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  Text,
 } from "recharts";
-import {
-  format,
-  parseISO,
-  isValid,
-  startOfWeek,
-  startOfMonth,
-  startOfYear,
-  differenceInCalendarDays,
-  addWeeks,
-  addMonths,
-  addYears,
-} from "date-fns";
 
-function GraphComponent({ data }) {
-  const [selectedDataKeys, setSelectedDataKeys] = useState({
-    Average_Stringency_Index: true,
-    Average_Dow_Jones_Closing_Price: true,
-    Average_Covid_Cases_Per_Million: true,
-  });
-  const [startDate, setStartDate] = useState(null);
-  const [endDate, setEndDate] = useState(null);
-  const [aggregation, setAggregation] = useState("monthly");
-  const [showQueryModal, setShowQueryModal] = useState(false);
-  const [showDataModal, setShowDataModal] = useState(false);
+export default function GraphComponent({ getCountry, getQuery }) {
+  const [countries, setCountries] = useState([]);
+  const [displayCountries, setDisplayCountries] = useState([]);
+  const [selectedCountries, setSelectedCountries] = useState([]);
+  const [timeframe, setTimeframe] = useState("monthly");
+  const [data, setData] = useState([]);
+  const [activeDataKeys, setActiveDataKeys] = useState({});
+  const [displayRelative, setDisplayRelative] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
-  const linesColors = {
-    Average_Stringency_Index: "#FF6347",
-    Average_Dow_Jones_Closing_Price: "#4682B4",
-    Average_Covid_Cases_Per_Million: "#32CD32",
+  useEffect(() => {
+    fetch(getCountry)
+      .then((response) => response.json())
+      .then((data) => {
+        if (data && data.rows) {
+          const sortedCountries = data.rows
+            .map((row) => ({ id: row[0], name: row[1] }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+          setCountries(sortedCountries);
+          setDisplayCountries(sortedCountries);
+        } else {
+          console.error("Invalid data structure:", data);
+        }
+      })
+      .catch((error) => console.error("Error fetching countries", error));
+  }, [getCountry]);
+
+  const handleCountryChange = (event) => {
+    const value = event.target.value;
+    if (event.target.checked) {
+      if (!selectedCountries.includes(value)) {
+        setSelectedCountries([...selectedCountries, value]);
+      }
+    } else {
+      setSelectedCountries(
+        selectedCountries.filter((country) => country !== value)
+      );
+    }
   };
 
-  // Safe date parsing
-  const safeParseDate = (item) => {
-    if (!item || item.length < 3 || typeof item[2] !== "string") {
-      console.error("Invalid or missing date:", item);
-      return null;
-    }
-    const date = parseISO(item[2]);
-    if (!isValid(date)) {
-      console.error("Failed to parse date:", item[2]);
-      return null;
-    }
-    return date;
+  const handleTimeframeChange = (event) => {
+    setTimeframe(event.target.value);
   };
 
-  const aggregateData = (data, granularity) => {
-    const grouped = {};
-    data.forEach((item) => {
-      const date = safeParseDate(item);
-      if (!date) return; // Skip items with invalid dates
+  const handleSearch = (event) => {
+    const searchTerm = event.target.value.toLowerCase();
+    setSearchTerm(searchTerm);
+    if (searchTerm) {
+      const filteredCountries = countries.filter((country) =>
+        country.name.toLowerCase().includes(searchTerm)
+      );
+      setDisplayCountries(filteredCountries);
+    } else {
+      setDisplayCountries(countries);
+    }
+  };
 
-      let key;
-      switch (granularity) {
-        case "daily":
-          key = format(date, "yyyy-MM-dd");
-          break;
-        case "weekly":
-          if (startDate) {
-            const weeksSinceStart = Math.floor(
-              differenceInCalendarDays(date, startDate) / 7
-            );
-            key = format(addWeeks(startDate, weeksSinceStart), "yyyy-MM-dd");
-          } else {
-            key = format(startOfWeek(date, { weekStartsOn: 1 }), "yyyy-MM-dd");
-          }
-          break;
-        case "monthly":
-          if (startDate) {
-            const monthsSinceStart = Math.floor(
-              differenceInCalendarDays(date, startDate) / 30
-            ); // Approximation
-            key = format(addMonths(startDate, monthsSinceStart), "yyyy-MM-dd");
-          } else {
-            key = format(startOfMonth(date), "yyyy-MM");
-          }
-          break;
-        case "yearly":
-          if (startDate) {
-            const yearsSinceStart = Math.floor(
-              differenceInCalendarDays(date, startDate) / 365
-            ); // Approximation
-            key = format(addYears(startDate, yearsSinceStart), "yyyy-MM-dd");
-          } else {
-            key = format(startOfYear(date), "yyyy");
-          }
-          break;
-        default:
-          key = format(startOfMonth(date), "yyyy-MM");
-      }
+  const fetchData = () => {
+    const countryParam = selectedCountries.join(",");
+    if (!countryParam) return;
 
-      if (!grouped[key]) {
-        grouped[key] = {
-          "DD-MON-YY": key,
-          counts: 0,
-          sumIndex: 0,
-          sumPrice: 0,
-          sumCases: 0,
-        };
-      }
-      const entry = grouped[key];
-      entry.counts++;
-      entry.sumIndex += item[3] || 0;
-      entry.sumPrice += item[4] || 0;
-      entry.sumCases += item[5] || 0;
-    });
+    const queryUrl = `${getQuery}?countryId=${countryParam}&timeframe=${timeframe}`;
+    fetch(queryUrl)
+      .then((response) => response.json())
+      .then((fetchedData) => {
+        if (fetchedData && fetchedData.rows) {
+          setData(fetchedData.rows);
+          const newActiveDataKeys = {};
+          fetchedData.metaData.slice(3).forEach((meta) => {
+            newActiveDataKeys[meta.name] = true;
+          });
+          setActiveDataKeys(newActiveDataKeys);
+        } else {
+          console.error(
+            "Received data is not properly formatted:",
+            fetchedData
+          );
+        }
+      })
+      .catch((error) => console.error("Error fetching data", error));
+  };
 
-    return Object.values(grouped).map((group) => ({
-      "DD-MON-YY": group["DD-MON-YY"],
-      Average_Stringency_Index: group.sumIndex / group.counts,
-      Average_Dow_Jones_Closing_Price: group.sumPrice / group.counts,
-      Average_Covid_Cases_Per_Million: group.sumCases / group.counts,
+  const toggleDataKey = (key) => {
+    setActiveDataKeys((prev) => ({
+      ...prev,
+      [key]: !prev[key],
     }));
   };
 
-  const filteredData = aggregateData(
-    data.filter((item) => {
-      const itemDate = safeParseDate(item);
-      return (
-        (!startDate || (itemDate && itemDate >= startDate)) &&
-        (!endDate || (itemDate && itemDate <= endDate))
-      );
-    }),
-    aggregation
-  );
-
-  // Function to handle date changes
-  const handleDateChange = (value, type) => {
-    const parsedDate = value ? parseISO(value) : null;
-    if (type === "start") {
-      setStartDate(parsedDate);
-    } else if (type === "end") {
-      setEndDate(parsedDate);
-    }
+  const toggleDisplayRelative = () => {
+    setDisplayRelative(!displayRelative);
   };
+
+  const prepareGraphData = (rows) => {
+    return rows.map((row) => {
+      const newObj = { date: row[2] };
+      Object.keys(activeDataKeys).forEach((key, index) => {
+        if (activeDataKeys[key]) {
+          newObj[key] = row[index + 3];
+        }
+      });
+      return newObj;
+    });
+  };
+
+  const colorPalette = [
+    "#8884d8",
+    "#82ca9d",
+    "#ffc658",
+    "#ff7300",
+    "#fa8072",
+    "#6a5acd",
+    "#ff6347",
+    "#3cb371",
+  ];
 
   return (
     <div className="flex">
-      <div className="w-72 bg-gray-200 p-5 overflow-auto min-h-screen">
-        <h2 className="font-bold text-lg mb-5">Graph Filters</h2>
-        <div className="mb-4">
-          <label className="block mb-2 text-sm font-medium text-gray-700">
-            Start Date:
-          </label>
-          <input
-            type="date"
-            className="block w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 cursor-pointer"
-            onChange={(e) => handleDateChange(e.target.value, "start")}
-          />
-          <label className="block mt-4 mb-2 text-sm font-medium text-gray-700">
-            End Date:
-          </label>
-          <input
-            type="date"
-            className="block w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 cursor-pointer"
-            onChange={(e) => handleDateChange(e.target.value, "end")}
-          />
-        </div>
-        <div className="mb-4">
-          {["daily", "weekly", "monthly", "yearly"].map((level) => (
-            <div key={level}>
-              <input
-                type="radio"
-                id={level}
-                name="aggregation"
-                checked={aggregation === level}
-                onChange={() => setAggregation(level)}
-                className="mr-2"
-              />
-              <label htmlFor={level}>
-                {level.charAt(0).toUpperCase() + level.slice(1)}
-              </label>
-            </div>
-          ))}
-        </div>
-        <button
-          onClick={() => setShowQueryModal(true)}
-          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-        >
-          Show SQL Query
-        </button>
-        <button
-          onClick={() => setShowDataModal(true)}
-          className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
-        >
-          Show Data Table
-        </button>
-        <div className="flex flex-col">
-          {Object.keys(selectedDataKeys).map((key) => (
-            <div key={key} className="flex items-center mb-2">
+      <div className="w-64 p-4 space-y-4 bg-blue-100 sticky top-0 h-screen overflow-auto">
+        <input
+          type="text"
+          placeholder="Search countries"
+          value={searchTerm}
+          onChange={handleSearch}
+          className="w-full p-2 border border-gray-300 rounded mb-4"
+        />
+        <div className="flex flex-col overflow-auto h-48">
+          {displayCountries.map((country) => (
+            <label key={country.id} className="inline-flex items-center">
               <input
                 type="checkbox"
-                id={key}
-                checked={selectedDataKeys[key]}
-                onChange={() =>
-                  setSelectedDataKeys({
-                    ...selectedDataKeys,
-                    [key]: !selectedDataKeys[key],
-                  })
-                }
-                className="mr-2"
+                className="form-checkbox h-5 w-5 text-gray-600"
+                value={country.id}
+                onChange={handleCountryChange}
+                checked={selectedCountries.includes(country.id)}
               />
-              <label htmlFor={key}>
-                {key.replace("_", " ").replace("Average", "Avg.")}
-              </label>
-            </div>
+              <span className="ml-2 text-gray-700">{country.name}</span>
+            </label>
           ))}
         </div>
-      </div>
-      <div className="flex-grow p-5">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart
-            data={filteredData}
-            margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+        <div className="flex flex-col mt-4">
+          <h3>Select Timeframe:</h3>
+          {["daily", "weekly", "monthly"].map((tf) => (
+            <label key={tf} className="inline-flex items-center mt-3">
+              <input
+                type="radio"
+                className="form-radio h-5 w-5 text-gray-600"
+                name="timeframe"
+                value={tf}
+                checked={timeframe === tf}
+                onChange={handleTimeframeChange}
+              />
+              <span className="ml-2 text-gray-700">{tf}</span>
+            </label>
+          ))}
+          <button
+            onClick={fetchData}
+            className="mt-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
           >
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis
-              dataKey="DD-MON-YY"
-              tickFormatter={(tickItem) => format(parseISO(tickItem), "MMM dd")}
+            Query
+          </button>
+          <div className="mt-4 flex items-center">
+            <input
+              type="checkbox"
+              checked={displayRelative}
+              onChange={toggleDisplayRelative}
+              className="form-checkbox h-5 w-5 text-gray-600"
             />
-            <YAxis />
-            <Tooltip
-              content={({ active, payload, label }) =>
-                active &&
-                payload && (
-                  <div className="p-3 bg-white shadow-lg rounded-lg">
-                    <p>
-                      {isValid(parseISO(label))
-                        ? format(parseISO(label), "MMM dd, yyyy")
-                        : "Invalid date"}
-                    </p>
-                    {payload.map((p, idx) => (
-                      <p key={idx}>
-                        <span className="font-bold">{p.name}:</span> {p.value}
-                      </p>
-                    ))}
-                  </div>
-                )
-              }
-            />
-            <Legend />
-            {Object.entries(selectedDataKeys)
-              .filter(([_, v]) => v)
-              .map(([key]) => (
-                <Line
-                  key={key}
-                  type="monotone"
-                  dataKey={key}
-                  stroke={linesColors[key]}
-                  activeDot={{ r: 8 }}
+            <span className="ml-2 text-gray-700">
+              Display Relative Country Data
+            </span>
+          </div>
+        </div>
+        {Object.keys(activeDataKeys).length > 0 && (
+          <div className="mt-4">
+            <h3 className="text-lg font-semibold">Extra Options:</h3>
+            {Object.keys(activeDataKeys).map((key, idx) => (
+              <label key={key} className="inline-flex items-center mt-3">
+                <input
+                  type="checkbox"
+                  className="form-checkbox h-5 w-5 text-blue-600"
+                  checked={activeDataKeys[key]}
+                  onChange={() => toggleDataKey(key)}
                 />
-              ))}
-          </LineChart>
-        </ResponsiveContainer>
+                <span className="ml-2 text-gray-700">{key}</span>
+              </label>
+            ))}
+          </div>
+        )}
       </div>
-      {/* Modals for SQL Query and Data Table */}
-      {showQueryModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-white p-5 rounded-lg shadow-lg relative">
-            <button
-              onClick={() => setShowQueryModal(false)}
-              className="absolute top-2 right-2 text-gray-800 hover:text-gray-600"
-            >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M6 18L18 6M6 6l12 12"
-                ></path>
-              </svg>
-            </button>
-            <pre>{`WITH Query1 (Country_ID, Country, CasesPerMil, Date_, Yr_Week, Yr_Month, Stock, StringencyIndex) AS
-    (SELECT CInfo.Country_ID, CInfo.Name, New_Cases/(Population/1000000), Stats.Date_Info, TO_CHAR(Stats.Date_Info, 'YYYY-WW'), 
-    TO_CHAR(Stats.Date_Info, 'YYYY-MM'), Dow_Jones_Closing, Stringency_Index
-    FROM tylerwescott.COVID_Statistics Stats
-    JOIN tylerwescott.Country_Info Cinfo ON Cinfo.Country_Id = Stats.Country_Id
-    JOIN tylerwescott.Public_Health_Measures HM ON Stats.Country_Id = HM.Country_Id AND Stats.Date_Info = HM.Date_Info
-    LEFT JOIN tylerwescott.Economic_Indicators Eco on Eco.Date_Info = Stats.Date_Info AND Eco.Country_ID = stats.Country_Id
-    WHERE CInfo.Country_ID = 'USA'),
-    ByDate (Country_ID, Country, "DD-MON-YY", Average_Stringency_Index, Average_Dow_Jones_Closing_Price, Average_Covid_Cases_Per_Million) AS (
-    SELECT Country_ID, Country, Date_, ROUND(AVG(StringencyIndex),2), ROUND(AVG(Stock),2), ROUND(AVG(CasesPerMil),2) 
-    FROM Query1
-    GROUP BY Country_ID, Country, Date_
-    ORDER BY Country_ID, Date_)
-    SELECT * FROM ByDate;`}</pre>
-          </div>
-        </div>
-      )}
-      {showDataModal && (
-        <div className="absolute min-h-screen w-full bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-white p-5 rounded-lg shadow-lg relative self-center w-full max-w-[1200px]">
-            <button
-              onClick={() => setShowDataModal(false)}
-              className="absolute top-2 right-2 text-gray-800 hover:text-gray-600"
-            >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M6 18L18 6M6 6l12 12"
-                ></path>
-              </svg>
-            </button>
-            <table className="table-auto w-full">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Stringency Index</th>
-                  <th>Dow Jones Closing Price</th>
-                  <th>Covid Cases Per Million</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredData.map((row, index) => (
-                  <tr key={index}>
-                    <td>
-                      {format(parseISO(row["DD-MON-YY"]), "MMM dd, yyyy")}
-                    </td>
-                    <td>{row.Average_Stringency_Index}</td>
-                    <td>{row.Average_Dow_Jones_Closing_Price}</td>
-                    <td>{row.Average_Covid_Cases_Per_Million}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      <div className="flex-grow p-4 overflow-auto">
+        {displayRelative
+          ? Object.keys(activeDataKeys)
+              .filter((key) => activeDataKeys[key])
+              .map((key, idx) => (
+                <div key={key}>
+                  <h3 className="text-xl font-bold mb-2">{key}</h3>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis
+                        dataKey="date"
+                        type="category"
+                        allowDuplicatedCategory={false}
+                      />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      {selectedCountries.map((country, index) => (
+                        <Line
+                          key={country}
+                          type="monotone"
+                          dataKey={key}
+                          data={prepareGraphData(
+                            data.filter((d) => d[0] === country)
+                          )}
+                          stroke={colorPalette[index % colorPalette.length]}
+                          name={countries.find((c) => c.id === country).name}
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              ))
+          : selectedCountries.map((country, index) => (
+              <div key={country}>
+                <h3 className="text-xl font-bold mb-2">
+                  {countries.find((c) => c.id === country).name} Overview
+                </h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart
+                    data={prepareGraphData(
+                      data.filter((d) => d[0] === country)
+                    )}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis
+                      dataKey="date"
+                      type="category"
+                      allowDuplicatedCategory={false}
+                    />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    {Object.keys(activeDataKeys)
+                      .filter((key) => activeDataKeys[key])
+                      .map((key, lineIndex) => {
+                        const lineData = data.filter(
+                          (d) => d[0] === country && activeDataKeys[key]
+                        );
+                        return lineData.length > 0 ? (
+                          <Line
+                            key={key}
+                            type="monotone"
+                            dataKey={key}
+                            stroke={
+                              colorPalette[lineIndex % colorPalette.length]
+                            }
+                          />
+                        ) : (
+                          <Text x={150} y={150} fill="#8884d8" fontSize="16">
+                            No data found for this country
+                          </Text>
+                        );
+                      })}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ))}
+      </div>
     </div>
   );
 }
-
-export default GraphComponent;
