@@ -10,8 +10,8 @@ app.use(express.json());
 
 // OracleDB connection details
 const dbConfig = {
-  user: "giovannibejar",
-  password: "w0x9Iu7pZ5E7FVxDQtfGAPvs",
+  user: "",
+  password: "",
   connectString: "oracle.cise.ufl.edu:1521/orcl",
 };
 
