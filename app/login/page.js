@@ -22,7 +22,7 @@ export default function Login() {
     try {
       await userEmailLogin(email, password);
       setAuthenticated(true);
-      router.push("/");
+      router.push("/queries");
     } catch (error) {
       setError(error.message);
     }

@@ -24,7 +24,7 @@ export default function Signup() {
       const signupResult = await userEmailSignup(email, password, displayName);
       if (signupResult === "success") {
         setAuthenticated(true);
-        router.push("/");
+        router.push("/queries");
       } else {
         setError(signupResult);
         console.error("hello", signupResult);
@@ -37,7 +37,7 @@ export default function Signup() {
 
   return (
     <div className="flex h-screen items-center justify-center bg-gray-100">
-      <div className="p-8 bg-white rounded shadow-md">
+      <div className="p-8 bg-white rounded shadow-md w-1/5">
         <form onSubmit={handleSignup} className="flex flex-col gap-4">
           <input
             type="text"
@@ -80,8 +80,12 @@ export default function Signup() {
           {error && <h2 className="text-red-500 text-center">{error}</h2>}
           <div className="text-center">
             <Link href="/login">
-              <button type="button" className="text-blue-500 hover:underline">
-                Already have an account? Login
+              <button
+                type="button"
+                className="text-black hover:underline flex flex-col items-center w-full"
+              >
+                Already have an account?
+                <span className="text-blue-500">Login instead</span>
               </button>
             </Link>
           </div>

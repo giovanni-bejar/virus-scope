@@ -13,7 +13,6 @@ import {
   Text,
 } from "recharts";
 import BeatLoader from "react-spinners/BeatLoader";
-import { usePathname } from "next/navigation";
 
 export default function GraphComponent({ getCountry, getQuery }) {
   const [countries, setCountries] = useState([]);
@@ -28,7 +27,6 @@ export default function GraphComponent({ getCountry, getQuery }) {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const pathname = usePathname();
 
   useEffect(() => {
     fetch(getCountry)
@@ -97,7 +95,7 @@ export default function GraphComponent({ getCountry, getQuery }) {
 
     setIsLoading(true);
     const countryParam = selectedCountries.join(",");
-    const queryUrl = `${getQuery}?countryId=${countryParam}&timeframe=${timeframe}&startDate=${startDate}&endDate=${endDate}`;
+    const queryUrl = `${getQuery}?countryId=${countryParam}&timeframe=${timeframe}`;
     fetch(queryUrl)
       .then((response) => response.json())
       .then((fetchedData) => {
