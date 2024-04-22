@@ -8,6 +8,7 @@ import {
   signOut,
   onAuthStateChanged,
   updateProfile,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 
 // Requirements to work with Firebase
@@ -85,4 +86,20 @@ export const userLogout = () => {
   signOut(auth).catch((error) => {
     throw error;
   });
+};
+
+// reset password
+export const sendResetPassword = async (providedEmail) => {
+  try {
+    if (auth.currentUser) {
+      await sendPasswordResetEmail(auth, auth.currentUser.email);
+      return "Success! Reset link sent to your registered email.";
+    } else {
+      await sendPasswordResetEmail(auth, providedEmail);
+      return "If an account exists with that email, a reset link has been sent!";
+    }
+  } catch (error) {
+    console.log(error);
+    throw new Error("Failed to send reset email.");
+  }
 };
