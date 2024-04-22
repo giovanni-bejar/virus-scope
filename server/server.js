@@ -432,7 +432,7 @@ app.get("/query4", async (req, res) => {
 
 // Query 5 API CALLS - COMPLETE
 app.get("/query5", async (req, res) => {
-  const { countryId, timeframe, getCountries } = req.query;
+  const { countryId, timeframe, getCountries, getRiskFactors } = req.query;
   let query;
 
   // Base WITH clause for all queries
@@ -474,6 +474,11 @@ app.get("/query5", async (req, res) => {
         CASE WHEN Obesity >= ObesityMin AND Obesity < ObesityP1 THEN 'Low' WHEN Obesity >= ObesityP1 AND Obesity < ObesityP2 THEN 'Medium' WHEN Obesity >= ObesityP2 THEN 'High' END AS ObesityRiskCategory
       FROM Denom, Percentiles
     ),
+    LookUp AS(
+      SELECT Country.Name AS Country, AlcoholRiskCategory AS Alcohol, DiabetesRiskCategory AS Diabetes, 
+      Aged65OlderRiskCategory AS Aged65OrOlder, GDPRiskCategory AS GDP, PopDenseRiskCategory AS PopulationDensity, 
+      SmokingRiskCategory AS Smoking, ObesityRiskCategory AS Obesity FROM RiskCategories
+      JOIN tylerwescott.Country_info Country ON RiskCategories.Countryid = Country.Country_id),
     FinalTable AS (
       SELECT 
         RiskCategories.*, Country_Info.Name AS Country, New_cases/(Country_Info.Population/1000000) AS CasesPerMil, New_Deaths/(Country_Info.Population/1000000) AS DeathsPerMil, 
@@ -498,6 +503,8 @@ app.get("/query5", async (req, res) => {
   // If getCountries is true, fetch countries only
   if (getCountries) {
     query = `${withClause} SELECT * FROM GetCountries`;
+  } else if (getRiskFactors) {
+    query = `${withClause} SELECT * FROM LookUp`;
   } else {
     // Build the main query based on the timeframe and country IDs
     let timeframeQuery;

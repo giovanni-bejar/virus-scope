@@ -29,6 +29,8 @@ export default function GraphComponent2({ getCountry, getQuery }) {
   const [isLoading, setIsLoading] = useState(false);
   const [riskFactors, setRiskFactors] = useState({});
   const [viewRiskFactors, setViewRiskFactors] = useState(false);
+  const [riskFactors2, setRiskFactors2] = useState([]);
+  const [viewRiskFactors2, setViewRiskFactors2] = useState(false);
 
   useEffect(() => {
     fetch(getCountry)
@@ -55,7 +57,6 @@ export default function GraphComponent2({ getCountry, getQuery }) {
       checked ? [...prev, value] : prev.filter((c) => c !== value)
     );
 
-    // Preserve the selection state of extra options
     if (checked) {
       setSavedActiveDataKeys((prev) => {
         const newSavedActiveDataKeys = { ...prev };
@@ -148,7 +149,7 @@ export default function GraphComponent2({ getCountry, getQuery }) {
                         newRiskFactors[riskFactorName].low.push(countryId);
                         break;
                       default:
-                        break; // Skip if value doesn't match High, Medium, or Low
+                        break;
                     }
                   }
                 }
@@ -199,6 +200,17 @@ export default function GraphComponent2({ getCountry, getQuery }) {
       fetchData();
     }
   }, [startDate, endDate]);
+
+  const handleFetchRiskFactors = () => {
+    fetch("http://localhost:3002/query5?getRiskFactors=true")
+      .then((response) => response.json())
+      .then((data) => {
+        const sortedData = data.rows.sort((a, b) => a[0].localeCompare(b[0]));
+        setRiskFactors2(sortedData);
+        setViewRiskFactors2(true);
+      })
+      .catch((error) => console.error("Failed to fetch risk factors:", error));
+  };
 
   const colorPalette = [
     "#8884d8",
@@ -274,6 +286,12 @@ export default function GraphComponent2({ getCountry, getQuery }) {
           >
             Query
           </button>
+          <button
+            onClick={handleFetchRiskFactors}
+            className="mt-2 bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+          >
+            View Risk Factors
+          </button>
           <div className="mt-4 flex items-center">
             <input
               type="checkbox"
@@ -326,6 +344,55 @@ export default function GraphComponent2({ getCountry, getQuery }) {
                   </ul>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+      {viewRiskFactors2 && (
+        <div className="absolute top-0 left-0 w-full h-full bg-white bg-opacity-90 flex justify-center items-center z-50">
+          <div className="bg-white p-8 rounded-lg shadow-lg">
+            <button
+              onClick={() => setViewRiskFactors2(!viewRiskFactors2)}
+              className="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded absolute top-2 right-2"
+            >
+              Close
+            </button>
+            <h2 className="text-xl font-bold mb-4">Risk Factors Table</h2>
+            <div className="overflow-auto max-h-[500px]">
+              <table className="min-w-full">
+                <thead className="bg-white">
+                  <tr>
+                    {[
+                      "Country",
+                      "Alcohol",
+                      "Diabetes",
+                      "Aged 65 or Older",
+                      "GDP",
+                      "Population Density",
+                      "Smoking",
+                      "Obesity",
+                    ].map((header) => (
+                      <th
+                        key={header}
+                        className="px-4 py-2 border bg-white sticky -top-2 z-10"
+                      >
+                        {header}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {riskFactors2.map((row, index) => (
+                    <tr key={index}>
+                      {row.map((cell, idx) => (
+                        <td key={idx} className="px-4 py-2 border">
+                          {cell}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
