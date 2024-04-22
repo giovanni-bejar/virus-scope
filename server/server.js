@@ -107,7 +107,7 @@ app.get("/query2", async (req, res) => {
   const withClause = `
     WITH Query2 AS (
       SELECT CInfo.Country_ID, Cinfo.Name AS Country, Hosp_patients/(Population/1000000) AS HospPatsPerMil, ICU_patients/(Population/1000000) AS IcuPatsPerMil, New_cases/(Population/1000000) AS CasesPerMil, New_deaths/(Population/1000000) AS DeathsPerMil,
-      CASE WHEN Icu_capacity IS NOT NULL AND Icu_capacity <> 0 THEN ROUND(Icu_patients/Icu_capacity, 2) END AS ICUcapRate,
+
       Hdata.Date_info AS D_Date, TO_CHAR(Hdata.Date_Info, 'YYYY-WW') AS Yr_Week, TO_CHAR(Hdata.Date_Info, 'YYYY-MM') AS Yr_Month
       FROM tylerwescott.Country_Info Cinfo
       LEFT JOIN tylerwescott.Health_Data Hdata ON Cinfo.Country_ID = Hdata.Country_ID
@@ -133,7 +133,7 @@ app.get("/query2", async (req, res) => {
       , ByDate AS (
         SELECT Country_ID, Country, D_Date AS "DD-MON-YY", ROUND(AVG(HospPatsPerMil), 2) AS Average_Hospital_Patients_Per_Million,
         ROUND(AVG(IcuPatsPerMil), 2) AS Average_ICU_Patients_Per_Million, ROUND(AVG(CasesPerMil), 2) AS Average_Covid_Cases_Per_Million,
-        ROUND(AVG(DeathsPerMil), 2) AS Average_Covid_Deaths_Per_Million, ROUND(AVG(ICUcapRate), 2) AS Average_ICU_Capacity_Rate
+        ROUND(AVG(DeathsPerMil), 2) AS Average_Covid_Deaths_Per_Million
         FROM Query2
         WHERE Country_ID IN (${countryIds.map((id) => `'${id}'`).join(", ")})
         GROUP BY Country_ID, Country, D_Date
@@ -144,7 +144,7 @@ app.get("/query2", async (req, res) => {
       , ByWeek AS (
         SELECT Country_ID, Country, Yr_Week AS "YYYY-WW", ROUND(AVG(HospPatsPerMil), 2) AS Average_Hospital_Patients_Per_Million,
         ROUND(AVG(IcuPatsPerMil), 2) AS Average_ICU_Patients_Per_Million, ROUND(AVG(CasesPerMil), 2) AS Average_Covid_Cases_Per_Million,
-        ROUND(AVG(DeathsPerMil), 2) AS Average_Covid_Deaths_Per_Million, ROUND(AVG(ICUcapRate), 2) AS Average_ICU_Capacity_Rate
+        ROUND(AVG(DeathsPerMil), 2) AS Average_Covid_Deaths_Per_Million
         FROM Query2
         WHERE Country_ID IN (${countryIds.map((id) => `'${id}'`).join(", ")})
         GROUP BY Country_ID, Country, Yr_Week
@@ -156,7 +156,7 @@ app.get("/query2", async (req, res) => {
       , ByMonth AS (
         SELECT Country_ID, Country, Yr_Month AS "YYYY-MM", ROUND(AVG(HospPatsPerMil), 2) AS Average_Hospital_Patients_Per_Million,
         ROUND(AVG(IcuPatsPerMil), 2) AS Average_ICU_Patients_Per_Million, ROUND(AVG(CasesPerMil), 2) AS Average_Covid_Cases_Per_Million,
-        ROUND(AVG(DeathsPerMil), 2) AS Average_Covid_Deaths_Per_Million, ROUND(AVG(ICUcapRate), 2) AS Average_ICU_Capacity_Rate
+        ROUND(AVG(DeathsPerMil), 2) AS Average_Covid_Deaths_Per_Million
         FROM Query2
         WHERE Country_ID IN (${countryIds.map((id) => `'${id}'`).join(", ")})
         GROUP BY Country_ID, Country, Yr_Month
